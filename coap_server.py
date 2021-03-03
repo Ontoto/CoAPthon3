@@ -25,11 +25,17 @@ class BasicResource(Resource):
                                             observable=True, allow_children=True)
         self.payload = "test"
 
+    def set_payload(self, client, userdata, message):
+        print("Received:%s %s" % (message.topic, message.payload))
+        self.payload = message.payload
+    
     def render_GET(self, request):
+        print("----------------")
         print(request.pretty_print())
         subpaths = []
         for opt in request.options:
-            print(str(opt))
+            if "Uri" not in str(opt) or "Uri-Host" in str(opt):
+                continue
             path = re.sub(r'\s+','',str(opt)).split(':')
             if path:
                 subpaths.append(path[1])
@@ -37,13 +43,18 @@ class BasicResource(Resource):
             print(subpaths)
             # Valid path
             id = subpaths[1]
-            print("Received message from:", id)
+            print("Received GET from:", id)
             topic = subpaths[0] + "/" + id
             print("Subscribing to topic:", topic)
             try:
-                msg = subscribe.simple(topic, hostname="mqtt.ontoto.com", auth=mqttAuth)
-                print("%s %s" % (msg.topic, msg.payload))
-                self.payload = msg.payload                             
+                msg = subscribe.simple(topic, hostname="mqtt.ontoto.com.au", auth=mqttAuth, keepalive=2,timeout=0.1)
+                if msg is None:
+                    print("Empty topic")
+                    self.payload = ""
+                else:    
+                    print("%s %s" % (msg.topic, msg.payload))
+                    self.payload = msg.payload
+                # self.content_type = "application/cbor"                           
             except Exception as e:
                 self.payload = "null"
                 print("Exception occurred")
@@ -63,6 +74,7 @@ class BasicResource(Resource):
         # print(len(request.uri_query))
         # print(request.uri_query)
         # print(res.payload)
+        print("----------------")
         print(request.pretty_print())
         subpaths = []
         for opt in request.options:
@@ -74,7 +86,7 @@ class BasicResource(Resource):
             print(subpaths)
             # Valid path
             id = subpaths[1]
-            print("Received message from:", id) 
+            print("Received POST from:", id) 
             timestamp = datetime.utcnow()
             topic = subpaths[0] + "/" + id
             if subpaths[0] == 'b':
@@ -83,7 +95,10 @@ class BasicResource(Resource):
             print("Publishing to topic:", topic)
             try:
                 publish.single(topic, payload=request.payload, qos=0, hostname="mqtt.ontoto.com.au", auth=mqttAuth,
-                                retain=True)               
+                                retain=True, keepalive=2)
+                # a = bytearray(b'\xA7\xA3\xFE\x00\x01\x03\x50\xA7\xA6\xE2\xA7\xA3\xFD\x8A\x4F')                
+                # publish.single("config/test", payload=a, qos=0, hostname="mqtt.ontoto.com.au", auth=mqttAuth,
+                #                 retain=True)                                 
             except Exception as e:
                 print("Exception occurred")
                 print('type is:', e.__class__.__name__)
@@ -101,9 +116,10 @@ class CoAPServer(CoAP):
         CoAP.__init__(self, (host, port))
         self.add_resource('b/', BasicResource())
         self.add_resource('config/', BasicResource())
+        self.add_resource('fw/', BasicResource())
 
 def main():
-    server = CoAPServer("192.168.15.13", 5683)
+    server = CoAPServer("192.168.1.109", 5683)
     try:
         server.listen(1)
     except KeyboardInterrupt:
