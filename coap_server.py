@@ -119,7 +119,7 @@ class CoAPServer(CoAP):
         self.add_resource('fw/', BasicResource())
 
 def main():
-    server = CoAPServer("192.168.1.109", 5683)
+    server = CoAPServer("10.0.0.9", 6968)
     try:
         server.listen(1)
     except KeyboardInterrupt:
